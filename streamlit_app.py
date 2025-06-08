@@ -50,11 +50,19 @@ with open("feature_names.pkl", "rb") as f:
 # --- INPUT FORM ---
 st.title("🚗 Car Price Prediction App")
 
+# Load dataset for mapping
+df = pd.read_csv("dataset.csv")
+brand_model_map = df.groupby("Brand")["Model"].unique().to_dict()
+
+# Get unique brands and models independently
+brands = sorted(df["Brand"].dropna().unique())
+models = sorted(df["Model"].dropna().unique())
+
 with st.form("prediction_form"):
     st.subheader("🔧 Enter Car Details:")
 
-    brand = st.selectbox("Brand", ['BMW', 'Audi', 'Mercedes', 'Toyota', 'Jaguar', 'Skoda', 'Hyundai', 'Mahindra', 'Kia'])
-    model = st.text_input("Model", "5 Series")
+    brand = st.selectbox("Car Brand", brands)
+    model = st.selectbox("Car Model", models)
     fuel = st.selectbox("Fuel Type", ['Petrol', 'Diesel'])
     trans = st.selectbox("Transmission", ['Manual', 'Automatic'])
 
