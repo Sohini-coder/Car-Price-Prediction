@@ -127,5 +127,24 @@ if st.session_state.get("show_chart", False):
             ax.set_title("Feature Importance")
             ax.invert_yaxis()
             st.pyplot(fig)
+            # 🔍 Display Core Feature Summary
+            core_features = [
+                'Mileage',
+                'Fuel_Efficiency',
+                'Previous_Owners',
+                'Engine_Size',
+                'Car_Condition_Score',
+                'Car_Age',
+                'Demand_Trend',
+                'Accident_History',
+                'Service_History'
+            ]
+
+            core_df = importance_df[importance_df["Feature"].isin(core_features)]
+            core_df = core_df.reset_index(drop=True)
+
+            st.markdown("### 🔎 Core Feature Table (Most Impactful Features)")
+            st.dataframe(core_df.style.background_gradient(cmap="YlOrBr"))
+            
     except Exception as e:
         st.error(f"Could not display feature importance: {e}")
