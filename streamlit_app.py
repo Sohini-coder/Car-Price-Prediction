@@ -114,26 +114,41 @@ if submitted:
         st.error(f"Prediction failed: {e}")
         st.session_state.show_chart = False
 
-# --- CORE FEATURE IMPORTANCE TABLE ONLY ---
+# --- CORE FEATURE IMPORTANCE (Table + Graph) ---
 if st.session_state.get("show_chart", False):
     try:
         model = pipeline.named_steps["model"]
         importances = model.feature_importances_
 
-        core_features = [
-            'Car_Age', 'Mileage', 'Engine_Size', 'Fuel_Efficiency',
-            'Previous_Owners', 'Demand_Trend', 'Accident_History',
-            'Car_Condition_Score', 'Service_History'
-        ]
-
-        core_indices = [i for i, name in enumerate(final_feature_names) if name in core_features]
-        core_df = pd.DataFrame({
-            "Feature": [final_feature_names[i] for i in core_indices],
-            "Importance": [importances[i] for i in core_indices]
+        # Feature names from preprocessor (with prefixes like 'scale__Mileage')
+        feature_df = pd.DataFrame({
+            "Feature": final_feature_names,
+            "Importance": importances
         }).sort_values(by="Importance", ascending=False)
 
-        st.subheader("📋 Core Feature Importance")
+        # Only include core features that were scaled
+        core_keywords = [
+            "Car_Age", "Mileage", "Engine_Size", "Fuel_Efficiency",
+            "Previous_Owners", "Demand_Trend", "Accident_History",
+            "Car_Condition_Score", "Service_History"
+        ]
+
+        # Filter matching those core feature substrings
+        core_df = feature_df[feature_df["Feature"].str.contains("|".join(core_keywords))]
+        core_df = core_df.reset_index(drop=True)
+        core_df["Feature"] = core_df["Feature"].str.replace("scale__", "")
+
+
+        st.subheader("📋 Core Feature Importance (Table)")
         st.dataframe(core_df.style.background_gradient(cmap="Oranges"))
 
+        # Add a horizontal bar chart
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.barh(core_df["Feature"], core_df["Importance"], color="#FFA07A")
+        ax.set_xlabel("Importance")
+        ax.set_title("Core Feature Impact on Price")
+        ax.invert_yaxis()
+        st.pyplot(fig)
+
     except Exception as e:
-        st.error(f"Could not display feature importance table: {e}")
+        st.error(f"Could not display core feature importance: {e}")
