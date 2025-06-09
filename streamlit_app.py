@@ -3,11 +3,10 @@ import pandas as pd
 import pickle
 import time
 import matplotlib.pyplot as plt
+import base64
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Car Price Predictor", page_icon="🚗", layout="wide")
-
-import base64
 
 def set_background(image_file):
     with open(image_file, "rb") as file:
@@ -23,14 +22,11 @@ def set_background(image_file):
             color: white;
         }}
         .main > div {{
-            background-color: rgba(0, 0, 0, 0.5);  /* Black with 50% opacity */
+            background-color: rgba(0, 0, 0, 0.5);
             padding: 2rem;
             border-radius: 1rem;
         }}
-        .css-1cpxqw2 {{
-            background-color: transparent !important;
-        }}
-        .css-18ni7ap {{
+        .css-1cpxqw2, .css-18ni7ap {{
             background-color: transparent !important;
         }}
         </style>
@@ -40,43 +36,51 @@ def set_background(image_file):
 
 set_background("background.png")
 
-# --- LOAD MODEL ---
-with open("car_price_pipeline_updated.pkl", "rb") as f:
+# --- LOAD MODEL & FEATURES ---
+with open("random_forest_final.pkl", "rb") as f:
     pipeline = pickle.load(f)
 
 with open("feature_names.pkl", "rb") as f:
     final_feature_names = pickle.load(f)
 
-# --- INPUT FORM ---
+with open("category_levels.pkl", "rb") as f:
+    cat_levels = pickle.load(f)
+
+# Unpack the categories in correct order
+brands = sorted(cat_levels[0])
+models = sorted(cat_levels[1])
+fuel_types = sorted(cat_levels[2])
+transmissions = sorted(cat_levels[3])
+
+# --- LOAD DATASET FOR INPUT OPTIONS ---
+df = pd.read_csv("dataset_1400.csv")
+
 st.title("🚗 Car Price Prediction App")
 
-# Load dataset for mapping
-df = pd.read_csv("dataset.csv")
-brand_model_map = df.groupby("Brand")["Model"].unique().to_dict()
-
-# Get unique brands and models independently
-brands = sorted(df["Brand"].dropna().unique())
-models = sorted(df["Model"].dropna().unique())
-
+# --- INPUT FORM ---
 with st.form("prediction_form"):
     st.subheader("🔧 Enter Car Details:")
 
     brand = st.selectbox("Car Brand", brands)
     model = st.selectbox("Car Model", models)
-    fuel = st.selectbox("Fuel Type", ['Petrol', 'Diesel'])
-    trans = st.selectbox("Transmission", ['Manual', 'Automatic'])
+
+    fuel = st.selectbox("Fuel Type", fuel_types)
+    trans = st.selectbox("Transmission", transmissions)
 
     age = st.slider("Car Age (years)", 0, 20, 2)
     mileage = st.slider("Mileage (km)", 0, 300000, 15000, step=1000)
     engine = st.slider("Engine Size (L)", 0.5, 5.0, 2.0, step=0.1)
     fuel_eff = st.slider("Fuel Efficiency (km/L)", 5.0, 25.0, 12.5, step=0.1)
-    owners = st.selectbox("Previous Owners", [0, 1, 2, 3])
-    demand = st.slider("Demand Trend", 1, 5, 4)
-    accidents = st.selectbox("Accident History", [0, 1])
+
+    owners = st.selectbox("Previous Owners", sorted(df["Previous_Owners"].dropna().unique()))
+    demand = st.selectbox("Demand Trend", sorted(df["Demand_Trend"].dropna().unique()))
+    accidents = st.selectbox("Accident History", sorted(df["Accident_History"].dropna().unique()))
     condition = st.slider("Condition Score", 1.0, 10.0, 9.0, step=0.1)
-    service = st.selectbox("Service History", [0, 1])
+    service = st.selectbox("Service History", sorted(df["Service_History"].dropna().unique()))
 
     submitted = st.form_submit_button("Predict Price")
+
+   
 
 # --- PREDICTION ---
 if submitted:
@@ -97,54 +101,39 @@ if submitted:
     }])
 
     try:
-        prediction = pipeline.predict(input_df)[0]
+        # Force input_df to match the training feature layout
+        transformed_input = pipeline.named_steps["preprocessor"].transform(input_df)
+        st.write("Input shape:", transformed_input.shape)
+        # Predict
+        prediction = pipeline.named_steps["model"].predict(transformed_input)[0]
+
         st.success(f"💰 Predicted Resale Price: ₹{int(prediction):,}")
         st.session_state.show_chart = True
+
     except Exception as e:
         st.error(f"Prediction failed: {e}")
         st.session_state.show_chart = False
 
-# --- FEATURE IMPORTANCE ---
+# --- CORE FEATURE IMPORTANCE TABLE ONLY ---
 if st.session_state.get("show_chart", False):
     try:
         model = pipeline.named_steps["model"]
         importances = model.feature_importances_
 
-        if len(importances) != len(final_feature_names):
-            st.warning("⚠️ Feature mismatch detected. Retrain model to fix.")
-        else:
-            importance_df = pd.DataFrame({
-                "Feature": final_feature_names,
-                "Importance": importances
-            }).sort_values(by="Importance", ascending=False)
+        core_features = [
+            'Car_Age', 'Mileage', 'Engine_Size', 'Fuel_Efficiency',
+            'Previous_Owners', 'Demand_Trend', 'Accident_History',
+            'Car_Condition_Score', 'Service_History'
+        ]
 
-            st.subheader("📋 Feature Importance")
-            st.dataframe(importance_df.style.background_gradient(cmap="Greens"))
+        core_indices = [i for i, name in enumerate(final_feature_names) if name in core_features]
+        core_df = pd.DataFrame({
+            "Feature": [final_feature_names[i] for i in core_indices],
+            "Importance": [importances[i] for i in core_indices]
+        }).sort_values(by="Importance", ascending=False)
 
-            fig, ax = plt.subplots(figsize=(10, 6))
-            ax.barh(importance_df["Feature"], importance_df["Importance"], color="#4CAF50")
-            ax.set_xlabel("Importance")
-            ax.set_title("Feature Importance")
-            ax.invert_yaxis()
-            st.pyplot(fig)
-            # 🔍 Display Core Feature Summary
-            core_features = [
-                'Mileage',
-                'Fuel_Efficiency',
-                'Previous_Owners',
-                'Engine_Size',
-                'Car_Condition_Score',
-                'Car_Age',
-                'Demand_Trend',
-                'Accident_History',
-                'Service_History'
-            ]
+        st.subheader("📋 Core Feature Importance")
+        st.dataframe(core_df.style.background_gradient(cmap="Oranges"))
 
-            core_df = importance_df[importance_df["Feature"].isin(core_features)]
-            core_df = core_df.reset_index(drop=True)
-
-            st.markdown("### 🔎 Core Feature Table (Most Impactful Features)")
-            st.dataframe(core_df.style.background_gradient(cmap="YlOrBr"))
-            
     except Exception as e:
-        st.error(f"Could not display feature importance: {e}")
+        st.error(f"Could not display feature importance table: {e}")
