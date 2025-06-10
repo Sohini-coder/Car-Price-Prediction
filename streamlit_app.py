@@ -149,10 +149,21 @@ if st.session_state.get("show_chart", False):
         st.dataframe(core_df.style.background_gradient(cmap="Oranges"))
 
         fig2, ax2 = plt.subplots(figsize=(10, 6))
-        ax2.barh(core_df["Feature"], core_df["Importance"], color="#FFA07A")
+        bars = ax2.barh(core_df["Feature"], core_df["Importance"], color="#FFA07A")
         ax2.set_xlabel("Importance")
         ax2.set_title("Core Feature Impact on Price")
         ax2.invert_yaxis()
+
+        # Adjust axis range to zoom into smaller values
+        ax2.set_xlim(0, core_df["Importance"].max() * 1.2)
+
+        # Add importance value as label next to each bar
+        for i, bar in enumerate(bars):
+            value = core_df["Importance"].iloc[i]
+            ax2.text(value + 0.001, bar.get_y() + bar.get_height()/2,
+                f"{value:.4f}", va='center', fontsize=9, color='black')
+
+        plt.tight_layout()
         st.pyplot(fig2)
 
     except Exception as e:
