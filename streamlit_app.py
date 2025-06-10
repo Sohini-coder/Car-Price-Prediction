@@ -67,7 +67,8 @@ with st.form("prediction_form"):
 
     age = st.slider("Car Age (years)", 0, 20, 2)
     mileage = st.slider("Mileage (km)", 0, 300000, 15000, step=1000)
-    engine = st.slider("Engine Size (L)", 0.5, 5.0, 2.0, step=0.1)
+    engine_liters = st.slider("Engine Size (L)", 0.5, 5.0, 2.0, step=0.1)
+    engine = int(engine_liters * 1000) 
     fuel_eff = st.slider("Fuel Efficiency (km/L)", 5.0, 25.0, 12.5, step=0.1)
 
     owners = st.selectbox("Previous Owners", sorted(df["Previous_Owners"].dropna().unique()))
