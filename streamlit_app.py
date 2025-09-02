@@ -135,7 +135,7 @@ if st.session_state.get("show_chart", False):
         ax1.invert_yaxis()
         st.pyplot(fig1)
 
-        # 🟠 2. CORE ENGINEERED FEATURES
+        # 2. CORE ENGINEERED FEATURES
         core_keywords = [
             "Car_Age", "Mileage", "Engine_Size", "Fuel_Efficiency",
             "Previous_Owners", "Demand_Trend", "Accident_History",
